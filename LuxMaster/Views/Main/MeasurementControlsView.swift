@@ -16,7 +16,7 @@ struct MeasurementControlsView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
+            .background(.quaternary, in: Capsule())
 
             Button(action: onSave) {
                 Label(lang.s("Messung speichern"), systemImage: "square.and.arrow.down")

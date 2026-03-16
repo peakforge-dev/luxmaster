@@ -218,32 +218,26 @@ class CameraManager: NSObject, ObservableObject {
         let bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
         let buffer = baseAddress.assumingMemoryBound(to: UInt8.self)
 
-        let sampleStep = 10
+        let sampleStep = 6
 
-        // Center zone: ~50% of frame area (70% × 70%), 15% margin each side
-        let centerLeft = width * 15 / 100
-        let centerRight = width - centerLeft
-        let centerTop = height * 15 / 100
-        let centerBottom = height - centerTop
+        // Spot zone: center ~30% of frame (35% margin each side)
+        let spotLeft = width * 35 / 100
+        let spotRight = width - spotLeft
+        let spotTop = height * 35 / 100
+        let spotBottom = height - spotTop
 
-        let centerWeight: Double = 2.0
-        let edgeWeight: Double = 1.0
+        var sum: Double = 0
+        var count: Int = 0
 
-        var weightedSum: Double = 0
-        var totalWeight: Double = 0
-
-        for y in stride(from: 0, to: height, by: sampleStep) {
-            for x in stride(from: 0, to: width, by: sampleStep) {
-                let luminance = Double(buffer[y * bytesPerRow + x])
-                let isCenter = x >= centerLeft && x < centerRight && y >= centerTop && y < centerBottom
-                let weight = isCenter ? centerWeight : edgeWeight
-                weightedSum += luminance * weight
-                totalWeight += weight
+        for y in stride(from: spotTop, to: spotBottom, by: sampleStep) {
+            for x in stride(from: spotLeft, to: spotRight, by: sampleStep) {
+                sum += Double(buffer[y * bytesPerRow + x])
+                count += 1
             }
         }
 
-        guard totalWeight > 0 else { return 0 }
-        return weightedSum / totalWeight / 255.0
+        guard count > 0 else { return 0 }
+        return sum / Double(count) / 255.0
     }
 }
 

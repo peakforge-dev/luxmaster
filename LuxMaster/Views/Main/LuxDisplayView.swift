@@ -17,8 +17,7 @@ struct LuxDisplayView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 32)
-        .padding(.vertical, 20)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .padding(.vertical, 16)
     }
 }
 

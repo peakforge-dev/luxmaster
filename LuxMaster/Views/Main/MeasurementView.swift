@@ -13,27 +13,26 @@ struct MeasurementView: View {
 
     private let demoLux: Double = 487.0
     private let demoRange: LuxRange = .indoor
+    private let spotSize: CGFloat = 180
+
+    private var luxValue: Double {
+        screenshotMode ? demoLux : cameraManager.smoothedLux
+    }
+
+    private var luxRange: LuxRange {
+        screenshotMode ? demoRange : LuxRange.from(lux: cameraManager.smoothedLux)
+    }
 
     var body: some View {
         ZStack {
-            if screenshotMode {
-                LinearGradient(
-                    colors: [.black, Color(red: 0.1, green: 0.1, blue: 0.2)],
-                    startPoint: .top, endPoint: .bottom
-                )
+            Color(.systemBackground)
                 .ignoresSafeArea()
-            } else if cameraManager.permissionGranted {
-                CameraPreviewView(session: cameraManager.captureSession)
-                    .ignoresSafeArea()
 
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-            } else {
+            if !screenshotMode && !cameraManager.permissionGranted {
                 cameraPermissionView
-            }
-
-            if screenshotMode || cameraManager.permissionGranted {
-                VStack(spacing: 16) {
+            } else {
+                VStack(spacing: 0) {
+                    // Top bar
                     if !screenshotMode {
                         HStack {
                             Spacer()
@@ -41,38 +40,62 @@ struct MeasurementView: View {
                                 cameraManager.toggleExposureLock()
                             } label: {
                                 Image(systemName: cameraManager.isExposureLocked ? "lock.fill" : "lock.open")
-                                    .font(.title2)
-                                    .foregroundStyle(cameraManager.isExposureLocked ? .yellow : .white)
-                                    .padding(12)
-                                    .background(.ultraThinMaterial, in: Circle())
+                                    .font(.body)
+                                    .foregroundStyle(cameraManager.isExposureLocked ? .yellow : .secondary)
+                                    .padding(10)
+                                    .background(.quaternary, in: Circle())
                             }
                             Button {
                                 cameraManager.switchCamera()
                             } label: {
                                 Image(systemName: "arrow.triangle.2.circlepath.camera")
-                                    .font(.title2)
-                                    .foregroundStyle(.white)
-                                    .padding(12)
-                                    .background(.ultraThinMaterial, in: Circle())
+                                    .font(.body)
+                                    .foregroundStyle(.secondary)
+                                    .padding(10)
+                                    .background(.quaternary, in: Circle())
                             }
                         }
+                        .padding(.horizontal)
+                        .padding(.top, 4)
                     }
 
                     Spacer()
 
-                    LuxDisplayView(
-                        luxValue: screenshotMode ? demoLux : cameraManager.smoothedLux,
-                        luxRange: screenshotMode ? demoRange : LuxRange.from(lux: cameraManager.smoothedLux)
-                    )
+                    // Camera spot
+                    ZStack {
+                        if screenshotMode {
+                            LinearGradient(
+                                colors: [.black, Color(red: 0.1, green: 0.1, blue: 0.2)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        } else {
+                            CameraPreviewView(session: cameraManager.captureSession)
+                        }
 
-                    InfoBannerView(
-                        isCalibrated: screenshotMode ? true : calibrationManager.isCalibrated,
-                        stability: screenshotMode ? 0.95 : cameraManager.stability
+                        // Crosshair
+                        crosshair
+                    }
+                    .frame(width: spotSize, height: spotSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
                     )
+                    .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
 
+                    Spacer()
+                        .frame(height: 24)
+
+                    // Lux display
+                    LuxDisplayView(luxValue: luxValue, luxRange: luxRange)
+
+                    Spacer()
+                        .frame(height: 16)
+
+                    // Controls
                     MeasurementControlsView(
-                        luxValue: screenshotMode ? demoLux : cameraManager.smoothedLux,
-                        luxRange: screenshotMode ? demoRange : LuxRange.from(lux: cameraManager.smoothedLux),
+                        luxValue: luxValue,
+                        luxRange: luxRange,
                         onSave: {
                             savedLux = cameraManager.smoothedLux
                             savedISO = Double(cameraManager.currentISO)
@@ -80,7 +103,12 @@ struct MeasurementView: View {
                             showingSaveSheet = true
                         }
                     )
+                    .padding(.horizontal)
 
+                    Spacer()
+                        .frame(height: 16)
+
+                    // Technical details
                     if screenshotMode {
                         HStack(spacing: 16) {
                             Label("ISO 64", systemImage: "camera.aperture")
@@ -88,17 +116,17 @@ struct MeasurementView: View {
                             Label("38%", systemImage: "sun.min.fill")
                         }
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
-                        .background(.ultraThinMaterial.opacity(0.5), in: Capsule())
-                        .padding(.bottom, 8)
+                        .background(.quaternary, in: Capsule())
                     } else {
                         technicalDetails
-                            .padding(.bottom, 8)
                     }
+
+                    Spacer()
                 }
-                .padding()
+                .padding(.bottom, 8)
             }
         }
         .sheet(isPresented: $showingSaveSheet) {
@@ -121,6 +149,37 @@ struct MeasurementView: View {
             cameraManager.calibrationProfile = profile
         }
     }
+
+    // MARK: - Crosshair
+
+    private var crosshair: some View {
+        let lineLength: CGFloat = 16
+        let lineWidth: CGFloat = 1
+        let color = Color.white.opacity(0.6)
+
+        return ZStack {
+            // Horizontal
+            Rectangle()
+                .fill(color)
+                .frame(width: lineLength, height: lineWidth)
+                .offset(x: -lineLength / 2 - 2)
+            Rectangle()
+                .fill(color)
+                .frame(width: lineLength, height: lineWidth)
+                .offset(x: lineLength / 2 + 2)
+            // Vertical
+            Rectangle()
+                .fill(color)
+                .frame(width: lineWidth, height: lineLength)
+                .offset(y: -lineLength / 2 - 2)
+            Rectangle()
+                .fill(color)
+                .frame(width: lineWidth, height: lineLength)
+                .offset(y: lineLength / 2 + 2)
+        }
+    }
+
+    // MARK: - Permission
 
     private var cameraPermissionView: some View {
         VStack(spacing: 20) {
@@ -152,6 +211,8 @@ struct MeasurementView: View {
         }
     }
 
+    // MARK: - Technical Details
+
     private var technicalDetails: some View {
         HStack(spacing: 16) {
             if cameraManager.isExposureLocked {
@@ -163,10 +224,10 @@ struct MeasurementView: View {
             Label(String(format: "%.0f%%", cameraManager.currentBrightness * 100), systemImage: "sun.min.fill")
         }
         .font(.caption)
-        .foregroundStyle(.white.opacity(0.7))
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial.opacity(0.5), in: Capsule())
+        .background(.quaternary, in: Capsule())
     }
 
     private func formatExposure(_ duration: Double) -> String {
